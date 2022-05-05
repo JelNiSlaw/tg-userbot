@@ -93,6 +93,7 @@ impl Bot {
                                     text.push_str(
                                         RESPONSES.choose(&mut rand::thread_rng()).unwrap(),
                                     );
+                                    println!("{}", text);
                                     self.client
                                         .send_message(
                                             &message.chat(),
