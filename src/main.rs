@@ -89,7 +89,7 @@ impl Bot {
                                 if sender.id() == ZENON
                                     && message.text().contains("https://youtu.be/")
                                 {
-                                    let mut text = String::from("dzięki Zenon");
+                                    let mut text = String::from("dzięki Zenon ");
                                     text.push_str(
                                         RESPONSES.choose(&mut rand::thread_rng()).unwrap(),
                                     );
