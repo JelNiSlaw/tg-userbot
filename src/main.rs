@@ -3,7 +3,7 @@ mod utils;
 use std::{error, io};
 
 use grammers_client::client::chats::AuthorizationError;
-use grammers_client::types::{Chat, User};
+use grammers_client::types::{Chat, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::Session;
 use rand::seq::SliceRandom;
@@ -13,6 +13,8 @@ use crate::utils::DisplayUser;
 const API_ID: i32 = 15608824;
 const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 
+const JELNISLAW: i64 = 807128293;
+const BAWIALNIA: i64 = 1463139920;
 const ZENON: i64 = 2125785292;
 
 const RESPONSES: [&str; 4] = [
@@ -87,25 +89,41 @@ impl Bot {
             match self.client.next_update().await? {
                 Some(update) => {
                     if let Update::NewMessage(message) = update {
-                        if let Some(Chat::User(sender)) = message.sender() {
-                            println!("{}: {:?}", sender.format_name()?, message.text());
-
-                            if sender.id() == ZENON && message.text().contains("https://youtu.be/")
-                            {
-                                let mut text = String::from("dzięki Zenon ");
-                                text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
-                                println!("{}", text);
-                                self.client
-                                    .send_message(
-                                        &message.chat(),
-                                        InputMessage::text(text).reply_to(Some(message.id())),
-                                    )
-                                    .await?;
-                            }
-                        }
+                        self.on_message(message).await?;
                     }
                 }
                 None => break,
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn on_message(&self, message: Message) -> Result<(), Box<dyn error::Error>> {
+        if let Some(Chat::User(sender)) = message.sender() {
+            println!("{}: {:?}", sender.format_name()?, message.text());
+
+            if sender.id() == ZENON && message.text().contains("https://youtu.be/") {
+                let mut text = String::from("dzięki Zenon ");
+                text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
+                println!("{}", text);
+                self.client
+                    .send_message(
+                        &message.chat(),
+                        InputMessage::text(text).reply_to(Some(message.id())),
+                    )
+                    .await?;
+            }
+
+            if message.chat().id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ")
+            {
+                let mut text = message.text()[19..].trim();
+                if text.to_lowercase().starts_with("@jelnislaw powiedz ") {
+                    text = "haha nob jestes";
+                }
+                if !text.is_empty() {
+                    self.client.send_message(message.chat(), text).await?;
+                }
             }
         }
 
