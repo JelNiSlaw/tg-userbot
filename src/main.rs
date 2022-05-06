@@ -2,7 +2,7 @@ mod utils;
 
 use std::{error, io};
 
-use grammers_client::client::chats::AuthorizationError;
+use grammers_client::client::chats::{AuthorizationError, InvocationError};
 use grammers_client::types::{Chat, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::Session;
@@ -16,13 +16,6 @@ const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 const JELNISLAW: i64 = 807128293;
 const BAWIALNIA: i64 = 1463139920;
 const ZENON: i64 = 2125785292;
-
-const RESPONSES: [&str; 4] = [
-    "zamknij ryj",
-    "bądź cicho",
-    "przestań spamić",
-    "super materiał (nie)",
-];
 
 struct Bot {
     pub client: Client,
@@ -109,26 +102,12 @@ impl Bot {
             println!("{}: {:?}", sender.format_name()?, message.text());
 
             if sender.id() == ZENON && message.text().contains("https://youtu.be/") {
-                let mut text = String::from("dzięki Zenon ");
-                text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
-                println!("{}", text);
-                self.client
-                    .send_message(
-                        &message.chat(),
-                        InputMessage::text(text).reply_to(Some(message.id())),
-                    )
-                    .await?;
+                self.zenon(&message).await?
             }
 
             if message.chat().id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ")
             {
-                let mut text = message.text()[19..].trim();
-                if text.to_lowercase().starts_with("@jelnislaw powiedz") {
-                    text = "haha nob jestes";
-                }
-                if !text.is_empty() {
-                    self.client.send_message(message.chat(), text).await?;
-                }
+                self.say(&message).await?
             }
         }
 
@@ -137,6 +116,41 @@ impl Bot {
 
     fn save_session(&self) -> io::Result<()> {
         self.client.session().save_to_file(&self.session_filename)
+    }
+
+    async fn zenon(&self, message: &Message) -> Result<(), InvocationError> {
+        let mut text = String::from("dzięki Zenon ");
+        text.push_str(
+            [
+                "zamknij ryj",
+                "bądź cicho",
+                "przestań spamić",
+                "super materiał (nie)",
+            ]
+            .choose(&mut rand::thread_rng())
+            .unwrap(),
+        );
+        println!("{}", text);
+        self.client
+            .send_message(
+                &message.chat(),
+                InputMessage::text(text).reply_to(Some(message.id())),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn say(&self, message: &Message) -> Result<(), InvocationError> {
+        let mut text = message.text()[19..].trim();
+        if text.to_lowercase().starts_with("@jelnislaw powiedz") {
+            text = "haha nob jestes";
+        }
+        if !text.is_empty() {
+            self.client.send_message(message.chat(), text).await?;
+        }
+
+        Ok(())
     }
 }
 
@@ -155,7 +169,5 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
     println!("Signed-In as: {}", user.format_name()?);
 
-    bot.poll_updates().await?;
-
-    Ok(())
+    bot.poll_updates().await
 }
