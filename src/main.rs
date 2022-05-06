@@ -38,7 +38,12 @@ impl Bot {
                 session,
                 api_id: API_ID,
                 api_hash: API_HASH.to_string(),
-                params: InitParams::default(),
+                params: InitParams {
+                    app_version: 69.to_string(),
+                    catch_up: false,
+                    update_queue_limit: None,
+                    ..Default::default()
+                },
             })
             .await?,
             session_filename: session_filename.to_string(),
@@ -118,7 +123,7 @@ impl Bot {
             if message.chat().id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ")
             {
                 let mut text = message.text()[19..].trim();
-                if text.to_lowercase().starts_with("@jelnislaw powiedz ") {
+                if text.to_lowercase().starts_with("@jelnislaw powiedz") {
                     text = "haha nob jestes";
                 }
                 if !text.is_empty() {
