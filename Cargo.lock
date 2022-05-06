@@ -196,18 +196,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grammers-bot"
-version = "0.1.0"
-dependencies = [
- "grammers-client",
- "grammers-session",
- "grammers-tl-types",
- "rand",
- "rpassword",
- "tokio",
-]
-
-[[package]]
 name = "grammers-client"
 version = "0.3.0"
 source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
@@ -683,6 +671,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "tg-userbot"
+version = "1.0.0"
+dependencies = [
+ "grammers-client",
+ "grammers-session",
+ "grammers-tl-types",
+ "rand",
+ "rpassword",
+ "tokio",
 ]
 
 [[package]]
