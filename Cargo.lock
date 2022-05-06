@@ -42,12 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "build_const"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ae4235e6dac0694637c763029ecea1a2ec9e4e06ec2729bd21ba4d9c863eb7"
-
-[[package]]
 name = "bytes"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -91,15 +85,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crc"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
-dependencies = [
- "build_const",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -137,6 +122,43 @@ dependencies = [
  "crc32fast",
  "libc",
  "miniz_oxide",
+]
+
+[[package]]
+name = "futures-core"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c09fd04b7e4073ac7156a9539b57a484a8ea920f79c7c675d05d289ab6110d3"
+
+[[package]]
+name = "futures-macro"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33c1e13800337f4d4d7a316bf45a567dbcb6ffe087f16424852d97e97a91f512"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "futures-task"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c66a976bf5909d801bbef33416c41372779507e7a6b3a5e25e4749c58f776a"
+
+[[package]]
+name = "futures-util"
+version = "0.3.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8b7abd5d659d9b90c8cba917f6ec750a74e2dc23902ef9cd4cc8c8b22e6036a"
+dependencies = [
+ "futures-core",
+ "futures-macro",
+ "futures-task",
+ "pin-project-lite",
+ "pin-utils",
+ "slab",
 ]
 
 [[package]]
@@ -179,7 +201,6 @@ version = "0.1.0"
 dependencies = [
  "grammers-client",
  "grammers-session",
- "grammers-tl-types",
  "rand",
  "rpassword",
  "tokio",
@@ -188,10 +209,10 @@ dependencies = [
 [[package]]
 name = "grammers-client"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84bfae2189920414b4a568905dd142c2de0444089e4576b3f4a7ed18ca706bea"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "chrono",
+ "futures-util",
  "grammers-crypto",
  "grammers-mtproto",
  "grammers-mtsender",
@@ -202,21 +223,20 @@ dependencies = [
  "md5",
  "mime_guess",
  "os_info",
+ "pin-project-lite",
  "tokio",
 ]
 
 [[package]]
 name = "grammers-crypto"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4d6bdea7f214275239af2adf9dc1eb1c27063b7e2544d5c7c58065f353e3c5d"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "aes",
  "getrandom",
  "glass_pumpkin",
  "hmac",
  "num-bigint",
- "once_cell",
  "pbkdf2",
  "sha1",
  "sha2",
@@ -225,15 +245,15 @@ dependencies = [
 [[package]]
 name = "grammers-mtproto"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18ea1cbc86afdb00d5611d778c42e77887e001aded8475727015d5ffb6b1827a"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "bytes",
- "crc",
+ "crc32fast",
  "flate2",
  "getrandom",
  "grammers-crypto",
  "grammers-tl-types",
+ "log",
  "num-bigint",
  "sha1",
 ]
@@ -241,11 +261,9 @@ dependencies = [
 [[package]]
 name = "grammers-mtsender"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96284443a857250f80ab7ae6c342b42827a6037c5c60290ff3f252541274f218"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "bytes",
- "grammers-crypto",
  "grammers-mtproto",
  "grammers-tl-types",
  "log",
@@ -255,10 +273,8 @@ dependencies = [
 [[package]]
 name = "grammers-session"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b979553f49d95b98cf98aa0ea673831f0f6c288d39fc147b6883ff9e3c3ed89"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
- "grammers-crypto",
  "grammers-tl-gen",
  "grammers-tl-parser",
  "grammers-tl-types",
@@ -268,8 +284,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-gen"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb32113e22ab45e7a17507ef920933c3fd1e9b6b7aab83be819a2cdd09777cc6"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "grammers-tl-parser",
 ]
@@ -277,8 +292,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-parser"
 version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58dfcda1464ce6f2d7fd9d2ef5525f341effe8611bcd80590e963eac5021362e"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "crc32fast",
 ]
@@ -286,8 +300,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-types"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c52e9459e6128805add4fce8c479fa9c90311bc3385b967573522bb65de0263"
+source = "git+https://github.com/Lonami/grammers#3ed47232c01dc3c05426cc3c346e7deb1dadc002"
 dependencies = [
  "grammers-tl-gen",
  "grammers-tl-parser",
@@ -502,6 +515,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
 
 [[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -509,9 +528,9 @@ checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec757218438d5fda206afc041538b2f6d889286160d649a86a24d37e1235afd1"
+checksum = "9027b48e9d4c9175fa2218adf3557f91c1137021739951d4932f5f8268ac48aa"
 dependencies = [
  "unicode-xid",
 ]
@@ -631,6 +650,12 @@ dependencies = [
  "digest",
  "opaque-debug",
 ]
+
+[[package]]
+name = "slab"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 
 [[package]]
 name = "socket2"

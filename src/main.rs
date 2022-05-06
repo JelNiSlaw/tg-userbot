@@ -13,13 +13,13 @@ use crate::utils::DisplayUser;
 const API_ID: i32 = 15608824;
 const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 
-const ZENON: i32 = 2125785292;
+const ZENON: i64 = 2125785292;
 
 const RESPONSES: [&str; 4] = [
     "zamknij ryj",
     "bądź cicho",
     "przestań spamić",
-    "super materiał",
+    "super materiał (nie)",
 ];
 
 struct Bot {
@@ -30,7 +30,7 @@ struct Bot {
 impl Bot {
     async fn new(session_filename: &str) -> Result<Self, AuthorizationError> {
         println!("Reading the session file");
-        let session = Session::load_file_or_create(session_filename).unwrap();
+        let session = Session::load_file_or_create(session_filename)?;
         Ok(Self {
             client: Client::connect(Config {
                 session,
@@ -63,11 +63,17 @@ impl Bot {
             {
                 Ok(user) => break user,
                 Err(SignInError::PasswordRequired(token)) => {
-                    // also loop here once PasswordToken supports
-                    break self
+                    match self
                         .client
                         .check_password(token, utils::prompt_password("Password: ")?)
-                        .await?;
+                        .await
+                    {
+                        Ok(user) => break user,
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            continue;
+                        }
+                    }
                 }
                 Err(err) => eprintln!("{}", err),
             }
@@ -78,29 +84,23 @@ impl Bot {
 
     async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
         loop {
-            let updates = self.client.next_updates().await?;
-            match updates {
-                Some(updates) => {
-                    for update in updates {
-                        if let Update::NewMessage(message) = update {
-                            if let Some(Chat::User(sender)) = message.sender() {
-                                println!("{}: {:?}", sender.format_name()?, message.text());
+            match self.client.next_update().await? {
+                Some(update) => {
+                    if let Update::NewMessage(message) = update {
+                        if let Some(Chat::User(sender)) = message.sender() {
+                            println!("{}: {:?}", sender.format_name()?, message.text());
 
-                                if sender.id() == ZENON
-                                    && message.text().contains("https://youtu.be/")
-                                {
-                                    let mut text = String::from("dzięki Zenon ");
-                                    text.push_str(
-                                        RESPONSES.choose(&mut rand::thread_rng()).unwrap(),
-                                    );
-                                    println!("{}", text);
-                                    self.client
-                                        .send_message(
-                                            &message.chat(),
-                                            InputMessage::text(text).reply_to(Some(message.id())),
-                                        )
-                                        .await?;
-                                }
+                            if sender.id() == ZENON && message.text().contains("https://youtu.be/")
+                            {
+                                let mut text = String::from("dzięki Zenon ");
+                                text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
+                                println!("{}", text);
+                                self.client
+                                    .send_message(
+                                        &message.chat(),
+                                        InputMessage::text(text).reply_to(Some(message.id())),
+                                    )
+                                    .await?;
                             }
                         }
                     }
