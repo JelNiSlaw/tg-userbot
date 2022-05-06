@@ -6,6 +6,7 @@ use grammers_client::client::chats::{AuthorizationError, InvocationError};
 use grammers_client::types::{Chat, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::Session;
+use grammers_tl_types as tl;
 use rand::seq::SliceRandom;
 
 use crate::utils::DisplayUser;
@@ -16,6 +17,15 @@ const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 const JELNISLAW: i64 = 807128293;
 const BAWIALNIA: i64 = 1463139920;
 const ZENON: i64 = 2125785292;
+const POLSKIE_KRAJOBRAZY: i64 = 1408357156;
+
+const RESPONSES: [&str; 5] = [
+    "zamknij ryj",
+    "bądź cicho",
+    "cicho bądź",
+    "przestań spamić",
+    "super materiał (nie)",
+];
 
 struct Bot {
     pub client: Client,
@@ -98,17 +108,42 @@ impl Bot {
     }
 
     async fn on_message(&self, message: Message) -> Result<(), Box<dyn error::Error>> {
-        if let Some(Chat::User(sender)) = message.sender() {
-            println!("{}: {:?}", sender.format_name()?, message.text());
+        let sender = match message.sender() {
+            Some(sender) => sender,
+            None => return Ok(()),
+        };
 
-            if sender.id() == ZENON && message.text().contains("https://youtu.be/") {
-                self.zenon(&message).await?
-            }
+        let (sender_id, sender_name) = match sender {
+            Chat::User(user) => (user.id(), user.format_name()?),
+            Chat::Group(group) => (group.id(), format!("{} ({})", group.title(), group.id())),
+            Chat::Channel(channel) => (
+                channel.id(),
+                format!("{} ({})", channel.title(), channel.id()),
+            ),
+        };
 
-            if message.chat().id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ")
-            {
-                self.say(&message).await?
-            }
+        println!("{}: {:?}", sender_name, message.text());
+
+        if sender_id == ZENON && message.text().contains("https://youtu.be/") {
+            self.zenon(&message).await?
+        } else if message.chat().id() == BAWIALNIA
+            && message.text().starts_with("@JelNiSlaw powiedz ")
+        {
+            self.say(&message).await?
+        } else if sender_id == POLSKIE_KRAJOBRAZY
+            && matches!(
+                message.forward_header(),
+                Some(tl::enums::MessageFwdHeader::Header(
+                    tl::types::MessageFwdHeader {
+                        from_id: Some(tl::enums::Peer::Channel(tl::types::PeerChannel {
+                            channel_id: POLSKIE_KRAJOBRAZY
+                        })),
+                        ..
+                    }
+                ))
+            )
+        {
+            self.polskie_krajobrazy(&message).await?;
         }
 
         Ok(())
@@ -120,22 +155,18 @@ impl Bot {
 
     async fn zenon(&self, message: &Message) -> Result<(), InvocationError> {
         let mut text = String::from("dzięki Zenon ");
-        text.push_str(
-            [
-                "zamknij ryj",
-                "bądź cicho",
-                "przestań spamić",
-                "super materiał (nie)",
-            ]
-            .choose(&mut rand::thread_rng())
-            .unwrap(),
-        );
+        text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
         println!("{}", text);
-        self.client
-            .send_message(
-                &message.chat(),
-                InputMessage::text(text).reply_to(Some(message.id())),
-            )
+        message
+            .reply(InputMessage::text(text).reply_to(Some(message.id())))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn polskie_krajobrazy(&self, message: &Message) -> Result<(), InvocationError> {
+        message
+            .reply(*RESPONSES.choose(&mut rand::thread_rng()).unwrap())
             .await?;
 
         Ok(())

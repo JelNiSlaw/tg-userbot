@@ -201,6 +201,7 @@ version = "0.1.0"
 dependencies = [
  "grammers-client",
  "grammers-session",
+ "grammers-tl-types",
  "rand",
  "rpassword",
  "tokio",
