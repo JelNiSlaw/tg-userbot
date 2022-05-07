@@ -3,11 +3,12 @@ mod utils;
 use std::{error, io};
 
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
-use grammers_client::types::{Chat, Message, User};
+use grammers_client::types::{Chat, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::Session;
 use grammers_tl_types as tl;
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 use crate::utils::DisplayUser;
 
@@ -16,6 +17,7 @@ const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 
 const JELNISLAW: i64 = 807128293;
 const BAWIALNIA: i64 = 1463139920;
+const JAROSŁAW_KARCEWICZ: i64 = 2128162985;
 const ZENON: i64 = 2125785292;
 const POLSKIE_KRAJOBRAZY: i64 = 1408357156;
 
@@ -93,14 +95,9 @@ impl Bot {
     }
 
     async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
-        loop {
-            match self.client.next_update().await? {
-                Some(update) => {
-                    if let Update::NewMessage(message) = update {
-                        self.on_message(message).await?;
-                    }
-                }
-                None => break,
+        while let Some(update) = self.client.next_update().await? {
+            if let Update::NewMessage(message) = update {
+                self.on_message(message).await?;
             }
         }
 
@@ -113,6 +110,8 @@ impl Bot {
             None => return Ok(()),
         };
 
+        let chat = message.chat();
+
         let (sender_id, sender_name) = match sender {
             Chat::User(user) => (user.id(), user.format_name()?),
             Chat::Group(group) => (group.id(), format!("{} ({})", group.title(), group.id())),
@@ -124,12 +123,18 @@ impl Bot {
 
         println!("{}: {:?}", sender_name, message.text());
 
-        if sender_id == ZENON && message.text().contains("https://youtu.be/") {
-            self.zenon(&message).await?
-        } else if message.chat().id() == BAWIALNIA
-            && message.text().starts_with("@JelNiSlaw powiedz ")
+        if (sender_id == JELNISLAW && message.text() == "=s")
+            || (sender_id == JAROSŁAW_KARCEWICZ
+                && message
+                    .media()
+                    .iter()
+                    .all(|m| matches!(m, Media::Document { .. })))
         {
-            self.say(&message).await?
+            self.strategia(&chat).await?;
+        } else if sender_id == ZENON && message.text().contains("https://youtu.be/") {
+            self.zenon(&message).await?
+        } else if chat.id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ") {
+            self.say(&message, &chat).await?
         } else if sender_id == POLSKIE_KRAJOBRAZY
             && matches!(
                 message.forward_header(),
@@ -153,6 +158,27 @@ impl Bot {
         self.client.session().save_to_file(&self.session_filename)
     }
 
+    async fn strategia(&self, chat: &Chat) -> Result<(), InvocationError> {
+        let mut rng = rand::thread_rng();
+        let mut messages = Vec::new();
+        while rng.gen::<bool>() {
+            messages.push(
+                self.client
+                    .send_message(
+                        chat,
+                        *["strategia", "strateg", "strategicznie"]
+                            .choose(&mut rng)
+                            .unwrap(),
+                    )
+                    .await?
+                    .id(),
+            );
+        }
+        self.client.delete_messages(chat, &messages).await?;
+
+        Ok(())
+    }
+
     async fn zenon(&self, message: &Message) -> Result<(), InvocationError> {
         let mut text = String::from("dzięki Zenon ");
         text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
@@ -172,13 +198,13 @@ impl Bot {
         Ok(())
     }
 
-    async fn say(&self, message: &Message) -> Result<(), InvocationError> {
+    async fn say(&self, message: &Message, chat: &Chat) -> Result<(), InvocationError> {
         let mut text = message.text()[19..].trim();
         if text.to_lowercase().starts_with("@jelnislaw powiedz") {
             text = "haha nob jestes";
         }
         if !text.is_empty() {
-            self.client.send_message(message.chat(), text).await?;
+            self.client.send_message(chat, text).await?;
         }
 
         Ok(())
