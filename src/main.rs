@@ -5,17 +5,18 @@ use std::{error, io};
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
 use grammers_client::types::{Chat, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
-use grammers_session::Session;
+use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::utils::DisplayUser;
+use crate::utils::FormatName;
 
 const API_ID: i32 = 15608824;
 const API_HASH: &str = "234be898e0230563009e9e12d8a2e546";
 
 const JELNISLAW: i64 = 807128293;
+const LOGS: i64 = 1714064879;
 const BAWIALNIA: i64 = 1463139920;
 const JAROSŁAW_KARCEWICZ: i64 = 2128162985;
 const ZENON: i64 = 2125785292;
@@ -32,6 +33,7 @@ const RESPONSES: [&str; 5] = [
 struct Bot {
     pub client: Client,
     session_filename: String,
+    logs_chat: Option<PackedChat>,
 }
 
 impl Bot {
@@ -52,10 +54,11 @@ impl Bot {
             })
             .await?,
             session_filename: session_filename.to_string(),
+            logs_chat: None,
         })
     }
 
-    async fn login(&mut self) -> Result<User, Box<dyn error::Error>> {
+    async fn sign_in(&mut self) -> Result<User, Box<dyn error::Error>> {
         let token = loop {
             match self
                 .client
@@ -94,68 +97,152 @@ impl Bot {
         Ok(user)
     }
 
-    async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
-        while let Some(update) = self.client.next_update().await? {
-            if let Update::NewMessage(message) = update {
-                self.on_message(message).await?;
-            }
-        }
+    async fn after_login(&mut self) -> Result<(), InvocationError> {
+        let logs_chat = self
+            .get_chat(LOGS)
+            .await?
+            .expect("Could not find logs chat");
+        println!("Sending logs to: {}", logs_chat.format_name());
+        self.logs_chat = Some(logs_chat.pack());
 
         Ok(())
     }
 
-    async fn on_message(&self, message: Message) -> Result<(), Box<dyn error::Error>> {
-        let sender = match message.sender() {
-            Some(sender) => sender,
-            None => return Ok(()),
-        };
-
-        let chat = message.chat();
-
-        let (sender_id, sender_name) = match sender {
-            Chat::User(user) => (user.id(), user.format_name()?),
-            Chat::Group(group) => (group.id(), format!("{} ({})", group.title(), group.id())),
-            Chat::Channel(channel) => (
-                channel.id(),
-                format!("{} ({})", channel.title(), channel.id()),
-            ),
-        };
-
-        println!("{}: {:?}", sender_name, message.text());
-
-        if (sender_id == JELNISLAW && message.text() == "=s")
-            || (sender_id == JAROSŁAW_KARCEWICZ
-                && message
-                    .media()
-                    .iter()
-                    .all(|m| matches!(m, Media::Document { .. })))
-        {
-            self.strategia(&chat).await?;
-        } else if sender_id == ZENON && message.text().contains("https://youtu.be/") {
-            self.zenon(&message).await?
-        } else if chat.id() == BAWIALNIA && message.text().starts_with("@JelNiSlaw powiedz ") {
-            self.say(&message, &chat).await?
-        } else if sender_id == POLSKIE_KRAJOBRAZY
-            && matches!(
-                message.forward_header(),
-                Some(tl::enums::MessageFwdHeader::Header(
-                    tl::types::MessageFwdHeader {
-                        from_id: Some(tl::enums::Peer::Channel(tl::types::PeerChannel {
-                            channel_id: POLSKIE_KRAJOBRAZY
-                        })),
-                        ..
+    async fn get_chat(&self, chat_id: i64) -> Result<Option<Chat>, InvocationError> {
+        let mut dialogs = self.client.iter_dialogs();
+        loop {
+            match dialogs.next().await? {
+                Some(dialog) => {
+                    if dialog.chat.id() == chat_id {
+                        return Ok(Some(dialog.chat));
                     }
-                ))
-            )
-        {
-            self.polskie_krajobrazy(&message).await?;
+                }
+                None => return Ok(None),
+            }
         }
-
-        Ok(())
     }
 
     fn save_session(&self) -> io::Result<()> {
         self.client.session().save_to_file(&self.session_filename)
+    }
+
+    async fn start(&mut self) -> Result<(), Box<dyn error::Error>> {
+        let user = if self.client.is_authorized().await? {
+            self.client.get_me().await?
+        } else {
+            println!("Sign-In required");
+            let user = self.sign_in().await?;
+            self.save_session()?;
+            user
+        };
+        println!("Signed-In as: {}", user.format_name());
+        self.after_login().await?;
+        self.poll_updates().await
+    }
+
+    async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
+        loop {
+            match self.client.next_update().await {
+                Ok(update) => match update {
+                    Some(update) => {
+                        if let Update::NewMessage(mut message) = update {
+                            self.on_message(&mut message).await?;
+                        }
+                    }
+                    None => return Ok(()),
+                },
+                Err(err) => self.log(&format!("Error: {err}")).await?,
+            }
+        }
+    }
+
+    async fn on_message(&self, message: &mut Message) -> Result<(), Box<dyn error::Error>> {
+        let chat = message.chat();
+
+        let sender_id = message
+            .sender()
+            .map(|s| s.id())
+            .unwrap_or_else(|| chat.id());
+
+        match sender_id {
+            JELNISLAW => {
+                if message.text().starts_with('=') {
+                    self.invoke_command(&message.text()[1..].to_string(), message)
+                        .await?;
+                }
+            }
+            JAROSŁAW_KARCEWICZ => {
+                if message
+                    .media()
+                    .iter()
+                    .any(|m| matches!(m, Media::Document { .. }))
+                {
+                    self.strategia(&chat).await?;
+                }
+            }
+            ZENON => {
+                if message.text().contains("https://youtu.be/") {
+                    self.zenon(message).await?
+                }
+            }
+            POLSKIE_KRAJOBRAZY => {
+                if matches!(
+                    message.forward_header(),
+                    Some(tl::enums::MessageFwdHeader::Header(
+                        tl::types::MessageFwdHeader {
+                            from_id: Some(tl::enums::Peer::Channel(tl::types::PeerChannel {
+                                channel_id: POLSKIE_KRAJOBRAZY
+                            })),
+                            ..
+                        }
+                    ))
+                ) {
+                    self.polskie_krajobrazy(message).await?;
+                }
+            }
+            _ => (),
+        }
+
+        #[allow(clippy::single_match)]
+        match chat.id() {
+            BAWIALNIA => {
+                if message.text().starts_with("@JelNiSlaw powiedz ") {
+                    self.say(message, &chat).await?;
+                }
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
+    async fn invoke_command(
+        &self,
+        command: &str,
+        message: &mut Message,
+    ) -> Result<(), InvocationError> {
+        let mut delete_message = true;
+
+        match command.trim().to_lowercase().as_str() {
+            "ping" => (),
+            "strategia" | "s" => self.strategia(&message.chat()).await?,
+            _ => delete_message = false,
+        };
+
+        if delete_message {
+            message.delete().await?
+        }
+
+        Ok(())
+    }
+
+    async fn log(&self, text: &str) -> Result<(), InvocationError> {
+        println!("Logging message: {text:?}");
+        self.client
+            .send_message(self.logs_chat.unwrap(), text)
+            .await?;
+
+        Ok(())
     }
 
     async fn strategia(&self, chat: &Chat) -> Result<(), InvocationError> {
@@ -214,17 +301,5 @@ impl Bot {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn error::Error>> {
     let mut bot = Bot::new(".session").await?;
-
-    let user = if bot.client.is_authorized().await? {
-        bot.client.get_me().await?
-    } else {
-        println!("Sign-In required");
-        let user = bot.login().await?;
-        bot.save_session()?;
-        user
-    };
-
-    println!("Signed-In as: {}", user.format_name()?);
-
-    bot.poll_updates().await
+    bot.start().await
 }

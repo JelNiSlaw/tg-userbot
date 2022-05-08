@@ -1,8 +1,7 @@
-use core::fmt;
 use std::fmt::Write as _;
 use std::io::{self, Write as _};
 
-use grammers_client::types::User;
+use grammers_client::types::{Channel, Chat, Group, User};
 pub use rpassword::prompt_password;
 
 pub fn prompt_input(prompt: &str) -> io::Result<String> {
@@ -14,26 +13,43 @@ pub fn prompt_input(prompt: &str) -> io::Result<String> {
     Ok(input)
 }
 
-pub trait DisplayUser {
-    fn format_name(&self) -> Result<String, fmt::Error>;
+pub trait FormatName {
+    fn format_name(&self) -> String;
 }
 
-impl DisplayUser for User {
-    fn format_name(&self) -> Result<String, fmt::Error> {
-        let mut name = String::new();
-        name.push_str(self.first_name());
-        match self.last_name() {
-            Some(last_name) => name.write_fmt(format_args!(" {}", last_name))?,
-            None => (),
-        }
-        name.write_fmt(format_args!(
-            " ({})",
-            match self.username() {
-                Some(username) => format!("@{}", username),
-                None => self.id().to_string(),
-            }
-        ))?;
+impl FormatName for User {
+    fn format_name(&self) -> String {
+        let mut name = self.full_name();
 
-        Ok(name)
+        let username = match self.username() {
+            Some(username) => format!("@{}", username),
+            None => format!("{}", self.id()),
+        };
+
+        match name.is_empty() {
+            false => {
+                name.write_fmt(format_args!(" ({})", username)).unwrap();
+                name
+            }
+            true => username,
+        }
+    }
+}
+
+impl FormatName for Group {
+    fn format_name(&self) -> String {
+        format!("{} ({})", self.title(), self.id())
+    }
+}
+
+impl FormatName for Channel {
+    fn format_name(&self) -> String {
+        format!("{} ({})", self.title(), self.id())
+    }
+}
+
+impl FormatName for Chat {
+    fn format_name(&self) -> String {
+        format!("{} ({})", self.name(), self.id())
     }
 }
