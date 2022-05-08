@@ -254,7 +254,10 @@ impl Bot {
                     .edit(text.chars().intersperse(' ').collect::<String>())
                     .await?
             }
-            ("strategia" | "s", None) => self.strategia(&message.chat()).await?,
+            ("strategia" | "s", None) => {
+                self.strategia(&message.chat()).await?;
+                message.delete().await?
+            }
             _ => (),
         };
 
