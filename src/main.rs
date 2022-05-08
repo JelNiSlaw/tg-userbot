@@ -1,5 +1,6 @@
 mod utils;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{error, io};
 
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
@@ -32,6 +33,7 @@ const RESPONSES: [&str; 5] = [
 
 struct Bot {
     pub client: Client,
+    running: AtomicBool,
     session_filename: String,
     logs_chat: Option<PackedChat>,
 }
@@ -53,6 +55,7 @@ impl Bot {
                 },
             })
             .await?,
+            running: AtomicBool::new(true),
             session_filename: session_filename.to_string(),
             logs_chat: None,
         })
@@ -137,11 +140,15 @@ impl Bot {
         };
         println!("Signed-In as: {}", user.format_name());
         self.after_login().await?;
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+            // Your handler here
+        });
         self.poll_updates().await
     }
 
     async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
-        loop {
+        while self.running.load(Ordering::Relaxed) {
             match self.client.next_update().await {
                 Ok(update) => match update {
                     Some(update) => {
@@ -154,9 +161,11 @@ impl Bot {
                 Err(err) => self.log(&format!("Error: {err}")).await?,
             }
         }
+
+        Ok(())
     }
 
-    async fn on_message(&self, message: &mut Message) -> Result<(), Box<dyn error::Error>> {
+    async fn on_message(&mut self, message: &mut Message) -> Result<(), Box<dyn error::Error>> {
         let chat = message.chat();
 
         let sender_id = message
@@ -217,7 +226,7 @@ impl Bot {
     }
 
     async fn invoke_command(
-        &self,
+        &mut self,
         command: &str,
         message: &mut Message,
     ) -> Result<(), InvocationError> {
@@ -225,6 +234,11 @@ impl Bot {
 
         match command.trim().to_lowercase().as_str() {
             "ping" => (),
+            "stop" => self.running.store(false, Ordering::Relaxed),
+            "id" => {
+                delete_message = false;
+                message.edit(message.chat().id().to_string()).await?;
+            }
             "strategia" | "s" => self.strategia(&message.chat()).await?,
             _ => delete_message = false,
         };
