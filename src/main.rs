@@ -1,6 +1,9 @@
+#![feature(iter_intersperse)]
+
 mod utils;
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::{error, io};
 
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
@@ -33,7 +36,7 @@ const RESPONSES: [&str; 5] = [
 
 struct Bot {
     pub client: Client,
-    running: AtomicBool,
+    running: Arc<AtomicBool>,
     session_filename: String,
     logs_chat: Option<PackedChat>,
 }
@@ -55,7 +58,7 @@ impl Bot {
                 },
             })
             .await?,
-            running: AtomicBool::new(true),
+            running: Arc::new(AtomicBool::new(true)),
             session_filename: session_filename.to_string(),
             logs_chat: None,
         })
@@ -140,9 +143,11 @@ impl Bot {
         };
         println!("Signed-In as: {}", user.format_name());
         self.after_login().await?;
+        let running = self.running.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.unwrap();
-            // Your handler here
+            println!("Stopping…");
+            running.store(false, Ordering::Relaxed);
         });
         self.poll_updates().await
     }
@@ -153,12 +158,14 @@ impl Bot {
                 Ok(update) => match update {
                     Some(update) => {
                         if let Update::NewMessage(mut message) = update {
-                            self.on_message(&mut message).await?;
+                            if let Err(err) = self.on_message(&mut message).await {
+                                self.log(&format!("Message handler: {err}")).await?;
+                            }
                         }
                     }
                     None => return Ok(()),
                 },
-                Err(err) => self.log(&format!("Error: {err}")).await?,
+                Err(err) => self.log(&format!("Update loop: {err}")).await?,
             }
         }
 
@@ -227,25 +234,29 @@ impl Bot {
 
     async fn invoke_command(
         &mut self,
-        command: &str,
+        input: &str,
         message: &mut Message,
     ) -> Result<(), InvocationError> {
-        let mut delete_message = true;
-
-        match command.trim().to_lowercase().as_str() {
-            "ping" => (),
-            "stop" => self.running.store(false, Ordering::Relaxed),
-            "id" => {
-                delete_message = false;
-                message.edit(message.chat().id().to_string()).await?;
-            }
-            "strategia" | "s" => self.strategia(&message.chat()).await?,
-            _ => delete_message = false,
+        let (command, args) = match input.split_once(' ') {
+            Some((command, args)) => (command, Some(args)),
+            None => (input, None),
         };
 
-        if delete_message {
-            message.delete().await?
-        }
+        match (command, args) {
+            ("ping", None) => message.delete().await?,
+            ("stop", None) => {
+                self.running.store(false, Ordering::Relaxed);
+                message.delete().await?;
+            }
+            ("id", None) => message.edit(message.chat().id().to_string()).await?,
+            ("long" | "space", Some(text)) => {
+                message
+                    .edit(text.chars().intersperse(' ').collect::<String>())
+                    .await?
+            }
+            ("strategia" | "s", None) => self.strategia(&message.chat()).await?,
+            _ => (),
+        };
 
         Ok(())
     }
