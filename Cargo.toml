@@ -4,9 +4,11 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1.0", features = ["macros", "rt", "signal"] }
+tokio = { version = "1.0", features = ["signal", "rt-multi-thread", "macros"] }
 grammers-client = { git = "https://github.com/Lonami/grammers" }
 grammers-session = { git = "https://github.com/Lonami/grammers" }
 grammers-tl-types = { git = "https://github.com/Lonami/grammers" }
+log = "0.4"
+simple_logger = { version = "2.1", features = ["threads", "nightly"] }
 rand = "0.8"
 rpassword = "6.0"

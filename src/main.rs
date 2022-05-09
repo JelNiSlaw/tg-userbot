@@ -11,6 +11,7 @@ use grammers_client::types::{Chat, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
+use log::{info, warn};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -43,7 +44,7 @@ struct Bot {
 
 impl Bot {
     async fn new(session_filename: &str) -> Result<Self, AuthorizationError> {
-        println!("Reading the session file");
+        info!("Reading the session file");
         let session = Session::load_file_or_create(session_filename)?;
         Ok(Self {
             client: Client::connect(Config {
@@ -108,7 +109,7 @@ impl Bot {
             .get_chat(LOGS)
             .await?
             .expect("Could not find logs chat");
-        println!("Sending logs to: {}", logs_chat.format_name());
+        info!("Sending logs to: {}", logs_chat.format_name());
         self.logs_chat = Some(logs_chat.pack());
 
         Ok(())
@@ -129,6 +130,7 @@ impl Bot {
     }
 
     fn save_session(&self) -> io::Result<()> {
+        info!("Saving the session file");
         self.client.session().save_to_file(&self.session_filename)
     }
 
@@ -141,15 +143,18 @@ impl Bot {
             self.save_session()?;
             user
         };
-        println!("Signed-In as: {}", user.format_name());
+        info!("Signed-In as: {}", user.format_name());
         self.after_login().await?;
         let running = self.running.clone();
         tokio::spawn(async move {
             tokio::signal::ctrl_c().await.unwrap();
-            println!("Stopping…");
+            warn!("Stopping…");
             running.store(false, Ordering::Relaxed);
         });
-        self.poll_updates().await
+        self.poll_updates().await?;
+        self.save_session()?;
+
+        Ok(())
     }
 
     async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
@@ -297,7 +302,6 @@ impl Bot {
     async fn zenon(&self, message: &Message) -> Result<(), InvocationError> {
         let mut text = String::from("dzięki Zenon ");
         text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
-        println!("{}", text);
         message
             .reply(InputMessage::text(text).reply_to(Some(message.id())))
             .await?;
@@ -326,8 +330,9 @@ impl Bot {
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
+    simple_logger::init_with_level(log::Level::Info)?;
     let mut bot = Bot::new(".session").await?;
     bot.start().await
 }
