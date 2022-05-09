@@ -18,13 +18,13 @@ const RESPONSES: [&str; 9] = [
     "jaki masz program że na każdy kanał wklejasz te treści ?",
 ];
 
-pub struct Context<'m> {
+pub struct Context {
     pub client: Client,
-    pub message: &'m mut Message,
+    pub message: Message,
     pub chat: Chat,
 }
 
-pub async fn strategia(ctx: &Context<'_>) -> Result<(), InvocationError> {
+pub async fn strategia(ctx: &Context) -> Result<(), InvocationError> {
     let mut rng = rand::thread_rng();
     let mut messages = Vec::new();
     while rng.gen::<bool>() {
@@ -45,7 +45,7 @@ pub async fn strategia(ctx: &Context<'_>) -> Result<(), InvocationError> {
     Ok(())
 }
 
-pub async fn zenon(ctx: &Context<'_>) -> Result<(), InvocationError> {
+pub async fn zenon(ctx: &Context) -> Result<(), InvocationError> {
     let mut rng = rand::thread_rng();
     ctx.message
         .reply(
@@ -62,7 +62,7 @@ pub async fn zenon(ctx: &Context<'_>) -> Result<(), InvocationError> {
     Ok(())
 }
 
-pub async fn polskie_krajobrazy(ctx: &Context<'_>) -> Result<(), InvocationError> {
+pub async fn polskie_krajobrazy(ctx: &Context) -> Result<(), InvocationError> {
     ctx.message
         .reply(*RESPONSES.choose(&mut rand::thread_rng()).unwrap())
         .await?;
@@ -70,7 +70,7 @@ pub async fn polskie_krajobrazy(ctx: &Context<'_>) -> Result<(), InvocationError
     Ok(())
 }
 
-pub async fn say(ctx: &Context<'_>) -> Result<(), InvocationError> {
+pub async fn say(ctx: &Context) -> Result<(), InvocationError> {
     let mut text = ctx.message.text()[19..].trim();
     if text.to_lowercase().starts_with("@jelnislaw powiedz") {
         text = "haha nob jestes";

@@ -9,7 +9,7 @@ use std::{error, io};
 
 use commands::Context;
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
-use grammers_client::types::{Chat, Media, Message, User};
+use grammers_client::types::{Dialog, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, SignInError, Update};
 use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
@@ -99,27 +99,26 @@ impl Bot {
 
     async fn after_login(&mut self) -> Result<(), InvocationError> {
         let logs_chat = self
-            .get_chat(LOGS)
+            .get_dialog(LOGS)
             .await?
-            .expect("Could not find logs chat");
+            .expect("Could not find logs chat")
+            .chat;
         info!("Sending logs to: {}", logs_chat.format_name());
         self.logs_chat = Some(logs_chat.pack());
 
         Ok(())
     }
 
-    async fn get_chat(&self, chat_id: i64) -> Result<Option<Chat>, InvocationError> {
+    async fn get_dialog(&self, dialog_id: i64) -> Result<Option<Dialog>, InvocationError> {
         let mut dialogs = self.client.iter_dialogs();
-        loop {
-            match dialogs.next().await? {
-                Some(dialog) => {
-                    if dialog.chat.id() == chat_id {
-                        return Ok(Some(dialog.chat));
-                    }
-                }
-                None => return Ok(None),
+
+        while let Some(dialog) = dialogs.next().await? {
+            if dialog.chat.id() == dialog_id {
+                return Ok(Some(dialog));
             }
         }
+
+        Ok(None)
     }
 
     fn save_session(&self) -> io::Result<()> {
@@ -155,8 +154,8 @@ impl Bot {
             match self.client.next_update().await {
                 Ok(update) => match update {
                     Some(update) => {
-                        if let Update::NewMessage(mut message) = update {
-                            if let Err(err) = self.on_message(&mut message).await {
+                        if let Update::NewMessage(message) = update {
+                            if let Err(err) = self.on_message(message).await {
                                 self.log(&format!("Message handler: {err}")).await?;
                             }
                         }
@@ -170,7 +169,7 @@ impl Bot {
         Ok(())
     }
 
-    async fn on_message(&mut self, message: &mut Message) -> Result<(), Box<dyn error::Error>> {
+    async fn on_message(&mut self, message: Message) -> Result<(), Box<dyn error::Error>> {
         let chat = message.chat();
 
         let sender_id = message
@@ -240,7 +239,7 @@ impl Bot {
     async fn invoke_command(
         &mut self,
         input: &str,
-        context: &mut Context<'_>,
+        context: &mut Context,
     ) -> Result<(), InvocationError> {
         let (command, args) = match input.split_once(' ') {
             Some((command, args)) => (command, Some(args)),
@@ -255,12 +254,13 @@ impl Bot {
                 context.message.delete().await?;
             }
             ("id", None) => context.message.edit(context.chat.id().to_string()).await?,
-            ("long" | "space", Some(text)) => {
+            ("long" | "space", Some(message)) => {
                 context
                     .message
-                    .edit(text.chars().intersperse(' ').collect::<String>())
+                    .edit(message.chars().intersperse(' ').collect::<String>())
                     .await?
             }
+            ("zenon", None) => commands::zenon(context).await?,
             ("strategia" | "s", None) => {
                 commands::strategia(context).await?;
                 context.message.delete().await?
@@ -271,10 +271,10 @@ impl Bot {
         Ok(())
     }
 
-    async fn log(&self, text: &str) -> Result<(), InvocationError> {
-        warn!("Logging message: {text:?}");
+    async fn log(&self, message: &str) -> Result<(), InvocationError> {
+        warn!("Logging message: {message:?}");
         self.client
-            .send_message(self.logs_chat.unwrap(), text)
+            .send_message(self.logs_chat.unwrap(), message)
             .await?;
 
         Ok(())
