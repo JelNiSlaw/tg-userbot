@@ -11,9 +11,10 @@ use grammers_client::types::{Chat, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
 use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
-use log::{info, warn};
+use log::{info, warn, LevelFilter};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use simple_logger::SimpleLogger;
 
 use crate::utils::FormatName;
 
@@ -250,6 +251,7 @@ impl Bot {
         match (command, args) {
             ("ping", None) => message.delete().await?,
             ("stop", None) => {
+                warn!("Stopping…");
                 self.running.store(false, Ordering::Relaxed);
                 message.delete().await?;
             }
@@ -332,7 +334,10 @@ impl Bot {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
-    simple_logger::init_with_level(log::Level::Info)?;
+    SimpleLogger::new()
+        .with_level(LevelFilter::Warn)
+        .with_module_level("tg_userbot", LevelFilter::Debug)
+        .init()?;
     let mut bot = Bot::new(".session").await?;
     bot.start().await
 }
