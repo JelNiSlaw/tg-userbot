@@ -3,9 +3,9 @@
 mod commands;
 mod utils;
 
+use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{error, io};
 
 use commands::Context;
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
@@ -13,7 +13,7 @@ use grammers_client::types::{Dialog, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, SignInError, Update};
 use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
-use log::{info, warn, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 use simple_logger::SimpleLogger;
 
 use crate::utils::FormatName;
@@ -58,7 +58,7 @@ impl Bot {
         })
     }
 
-    async fn sign_in(&mut self) -> Result<User, Box<dyn error::Error>> {
+    async fn sign_in(&mut self) -> Result<User, Box<dyn std::error::Error>> {
         let token = loop {
             match self
                 .client
@@ -126,7 +126,7 @@ impl Bot {
         self.client.session().save_to_file(&self.session_filename)
     }
 
-    async fn start(&mut self) -> Result<(), Box<dyn error::Error>> {
+    async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let user = if self.client.is_authorized().await? {
             self.client.get_me().await?
         } else {
@@ -149,7 +149,7 @@ impl Bot {
         Ok(())
     }
 
-    async fn poll_updates(&mut self) -> Result<(), Box<dyn error::Error>> {
+    async fn poll_updates(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while self.running.load(Ordering::Relaxed) {
             match self.client.next_update().await {
                 Ok(update) => match update {
@@ -162,14 +162,18 @@ impl Bot {
                     }
                     None => return Ok(()),
                 },
-                Err(err) => self.log(&format!("Update loop: {err}")).await?,
-            }
+                Err(err) => {
+                    if let Err(err) = self.log(&format!("Update loop: {err}")).await {
+                        error!("Logging error: {err}");
+                    }
+                }
+            };
         }
 
         Ok(())
     }
 
-    async fn on_message(&mut self, message: Message) -> Result<(), Box<dyn error::Error>> {
+    async fn on_message(&mut self, message: Message) -> Result<(), Box<dyn std::error::Error>> {
         let chat = message.chat();
 
         let sender_id = message
@@ -282,7 +286,7 @@ impl Bot {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     SimpleLogger::new()
         .with_level(LevelFilter::Warn)
         .with_module_level("tg_userbot", LevelFilter::Debug)
