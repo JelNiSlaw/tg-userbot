@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.0", features = ["signal", "rt-multi-thread", "macros"] }
-grammers-client = { git = "https://github.com/Lonami/grammers" }
+grammers-client = { git = "https://github.com/Lonami/grammers", features = [
+    "markdown",
+] }
 grammers-session = { git = "https://github.com/Lonami/grammers" }
 grammers-tl-types = { git = "https://github.com/Lonami/grammers" }
 log = "0.4"

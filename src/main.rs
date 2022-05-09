@@ -1,11 +1,13 @@
 #![feature(iter_intersperse)]
 
+mod commands;
 mod utils;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{error, io};
 
+use commands::Context;
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
 use grammers_client::types::{Chat, Media, Message, User};
 use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
@@ -186,30 +188,37 @@ impl Bot {
             .map(|s| s.id())
             .unwrap_or_else(|| chat.id());
 
+        let mut context = Context {
+            client: self.client.clone(),
+            chat: message.chat(),
+            message,
+        };
+
         match sender_id {
             JELNISLAW => {
-                if message.text().starts_with('=') {
-                    self.invoke_command(&message.text()[1..].to_string(), message)
+                if context.message.text().starts_with('=') {
+                    self.invoke_command(&context.message.text()[1..].to_string(), &mut context)
                         .await?;
                 }
             }
             JAROSŁAW_KARCEWICZ => {
-                if message
+                if context
+                    .message
                     .media()
                     .iter()
                     .any(|m| matches!(m, Media::Document { .. }))
                 {
-                    self.strategia(&chat).await?;
+                    commands::strategia(&context).await?;
                 }
             }
             ZENON => {
-                if message.text().contains("https://youtu.be/") {
-                    self.zenon(message).await?
+                if context.message.text().contains("https://youtu.be/") {
+                    commands::zenon(&context).await?
                 }
             }
             POLSKIE_KRAJOBRAZY => {
                 if matches!(
-                    message.forward_header(),
+                    context.message.forward_header(),
                     Some(tl::enums::MessageFwdHeader::Header(
                         tl::types::MessageFwdHeader {
                             from_id: Some(tl::enums::Peer::Channel(tl::types::PeerChannel {
@@ -219,7 +228,7 @@ impl Bot {
                         }
                     ))
                 ) {
-                    self.polskie_krajobrazy(message).await?;
+                    commands::polskie_krajobrazy(&context).await?;
                 }
             }
             _ => (),
@@ -228,8 +237,8 @@ impl Bot {
         #[allow(clippy::single_match)]
         match chat.id() {
             BAWIALNIA => {
-                if message.text().starts_with("@JelNiSlaw powiedz ") {
-                    self.say(message, &chat).await?;
+                if context.message.text().starts_with("@JelNiSlaw powiedz ") {
+                    commands::say(&context).await?;
                 }
             }
             _ => (),
@@ -241,7 +250,7 @@ impl Bot {
     async fn invoke_command(
         &mut self,
         input: &str,
-        message: &mut Message,
+        context: &mut Context<'_>,
     ) -> Result<(), InvocationError> {
         let (command, args) = match input.split_once(' ') {
             Some((command, args)) => (command, Some(args)),
@@ -249,21 +258,22 @@ impl Bot {
         };
 
         match (command, args) {
-            ("ping", None) => message.delete().await?,
+            ("ping", None) => context.message.delete().await?,
             ("stop", None) => {
                 warn!("Stopping…");
                 self.running.store(false, Ordering::Relaxed);
-                message.delete().await?;
+                context.message.delete().await?;
             }
-            ("id", None) => message.edit(message.chat().id().to_string()).await?,
+            ("id", None) => context.message.edit(context.chat.id().to_string()).await?,
             ("long" | "space", Some(text)) => {
-                message
+                context
+                    .message
                     .edit(text.chars().intersperse(' ').collect::<String>())
                     .await?
             }
             ("strategia" | "s", None) => {
-                self.strategia(&message.chat()).await?;
-                message.delete().await?
+                commands::strategia(&context).await?;
+                context.message.delete().await?
             }
             _ => (),
         };
@@ -272,61 +282,10 @@ impl Bot {
     }
 
     async fn log(&self, text: &str) -> Result<(), InvocationError> {
-        println!("Logging message: {text:?}");
+        warn!("Logging message: {text:?}");
         self.client
             .send_message(self.logs_chat.unwrap(), text)
             .await?;
-
-        Ok(())
-    }
-
-    async fn strategia(&self, chat: &Chat) -> Result<(), InvocationError> {
-        let mut rng = rand::thread_rng();
-        let mut messages = Vec::new();
-        while rng.gen::<bool>() {
-            messages.push(
-                self.client
-                    .send_message(
-                        chat,
-                        *["strategia", "strateg", "strategicznie"]
-                            .choose(&mut rng)
-                            .unwrap(),
-                    )
-                    .await?
-                    .id(),
-            );
-        }
-        self.client.delete_messages(chat, &messages).await?;
-
-        Ok(())
-    }
-
-    async fn zenon(&self, message: &Message) -> Result<(), InvocationError> {
-        let mut text = String::from("dzięki Zenon ");
-        text.push_str(RESPONSES.choose(&mut rand::thread_rng()).unwrap());
-        message
-            .reply(InputMessage::text(text).reply_to(Some(message.id())))
-            .await?;
-
-        Ok(())
-    }
-
-    async fn polskie_krajobrazy(&self, message: &Message) -> Result<(), InvocationError> {
-        message
-            .reply(*RESPONSES.choose(&mut rand::thread_rng()).unwrap())
-            .await?;
-
-        Ok(())
-    }
-
-    async fn say(&self, message: &Message, chat: &Chat) -> Result<(), InvocationError> {
-        let mut text = message.text()[19..].trim();
-        if text.to_lowercase().starts_with("@jelnislaw powiedz") {
-            text = "haha nob jestes";
-        }
-        if !text.is_empty() {
-            self.client.send_message(chat, text).await?;
-        }
 
         Ok(())
     }
