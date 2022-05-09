@@ -10,12 +10,10 @@ use std::{error, io};
 use commands::Context;
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
 use grammers_client::types::{Chat, Media, Message, User};
-use grammers_client::{Client, Config, InitParams, InputMessage, SignInError, Update};
+use grammers_client::{Client, Config, InitParams, SignInError, Update};
 use grammers_session::{PackedChat, Session};
 use grammers_tl_types as tl;
 use log::{info, warn, LevelFilter};
-use rand::seq::SliceRandom;
-use rand::Rng;
 use simple_logger::SimpleLogger;
 
 use crate::utils::FormatName;
@@ -29,14 +27,6 @@ const BAWIALNIA: i64 = 1463139920;
 const JAROSŁAW_KARCEWICZ: i64 = 2128162985;
 const ZENON: i64 = 2125785292;
 const POLSKIE_KRAJOBRAZY: i64 = 1408357156;
-
-const RESPONSES: [&str; 5] = [
-    "zamknij ryj",
-    "bądź cicho",
-    "cicho bądź",
-    "przestań spamić",
-    "super materiał (nie)",
-];
 
 struct Bot {
     pub client: Client,
@@ -272,7 +262,7 @@ impl Bot {
                     .await?
             }
             ("strategia" | "s", None) => {
-                commands::strategia(&context).await?;
+                commands::strategia(context).await?;
                 context.message.delete().await?
             }
             _ => (),

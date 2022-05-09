@@ -4,7 +4,19 @@ use grammers_client::{Client, InputMessage};
 use rand::prelude::SliceRandom;
 use rand::Rng;
 
-use crate::{RESPONSES, ZENON};
+use crate::ZENON;
+
+const RESPONSES: [&str; 9] = [
+    "zamknij ryj",
+    "bądź cicho",
+    "cicho bądź",
+    "przestań spamić",
+    "super materiał (nie)",
+    "ratio",
+    "kto pytał",
+    "nie pytałem",
+    "jaki masz program że na każdy kanał wklejasz te treści ?",
+];
 
 pub struct Context<'m> {
     pub client: Client,
@@ -34,12 +46,14 @@ pub async fn strategia(ctx: &Context<'_>) -> Result<(), InvocationError> {
 }
 
 pub async fn zenon(ctx: &Context<'_>) -> Result<(), InvocationError> {
+    let mut rng = rand::thread_rng();
     ctx.message
         .reply(
             InputMessage::markdown(format!(
-                "dzięki [Zenon](tg://user?id={}) {}",
-                ZENON,
-                RESPONSES.choose(&mut rand::thread_rng()).unwrap()
+                "dzięki [{name}](tg://user?id={id}) {text}",
+                name = ["Zenon", "Zenon Witkowski"].choose(&mut rng).unwrap(),
+                id = ZENON,
+                text = RESPONSES.choose(&mut rng).unwrap()
             ))
             .reply_to(Some(ctx.message.id())),
         )
