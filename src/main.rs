@@ -205,8 +205,11 @@ impl Bot {
                 }
             }
             ZENON => {
-                if context.message.text().contains("https://youtu.be/") {
+                let text = context.message.text();
+                if text.contains("https://") {
                     commands::zenon(&context).await?
+                } else if text.contains("http://") {
+                    commands::zenon_http_noob(&context).await?;
                 }
             }
             POLSKIE_KRAJOBRAZY => {

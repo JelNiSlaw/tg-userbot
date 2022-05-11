@@ -48,15 +48,20 @@ pub async fn strategia(ctx: &Context) -> Result<(), InvocationError> {
 pub async fn zenon(ctx: &Context) -> Result<(), InvocationError> {
     let mut rng = rand::thread_rng();
     ctx.message
-        .reply(
-            InputMessage::markdown(format!(
-                "dzięki [{name}](tg://user?id={id}) {text}",
-                name = ["Zenon", "Zenon Witkowski"].choose(&mut rng).unwrap(),
-                id = ZENON,
-                text = RESPONSES.choose(&mut rng).unwrap()
-            ))
-            .reply_to(Some(ctx.message.id())),
-        )
+        .reply(InputMessage::markdown(format!(
+            "dzięki [{name}](tg://user?id={id}) {text}",
+            name = ["Zenon", "Zenon Witkowski"].choose(&mut rng).unwrap(),
+            id = ZENON,
+            text = RESPONSES.choose(&mut rng).unwrap()
+        )))
+        .await?;
+
+    Ok(())
+}
+
+pub async fn zenon_http_noob(ctx: &Context) -> Result<(), InvocationError> {
+    ctx.message
+        .reply("haha http:// brak szyfrowania noob")
         .await?;
 
     Ok(())
