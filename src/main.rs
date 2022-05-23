@@ -240,6 +240,10 @@ impl Bot {
             _ => (),
         }
 
+        if context.message.text() == "/prpr@JelNiSlaw" {
+            context.message.reply("Peropero").await?;
+        }
+
         Ok(())
     }
 
