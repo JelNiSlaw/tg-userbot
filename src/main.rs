@@ -4,8 +4,6 @@ mod commands;
 mod utils;
 
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use commands::Context;
 use grammers_client::client::chats::{AuthorizationError, InvocationError};
@@ -30,7 +28,6 @@ const POLSKIE_KRAJOBRAZY: i64 = 1408357156;
 
 struct Bot {
     pub client: Client,
-    running: Arc<AtomicBool>,
     session_filename: String,
     logs_chat: Option<PackedChat>,
 }
@@ -52,7 +49,6 @@ impl Bot {
                 },
             })
             .await?,
-            running: Arc::new(AtomicBool::new(true)),
             session_filename: session_filename.to_string(),
             logs_chat: None,
         })
@@ -137,43 +133,40 @@ impl Bot {
         };
         info!("Signed-In as: {}", user.format_name());
         self.after_login().await?;
-        let running = self.running.clone();
-        tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.unwrap();
-            warn!("Stopping…");
-            running.store(false, Ordering::Relaxed);
-        });
         self.poll_updates().await?;
         self.save_session()?;
 
         Ok(())
     }
 
-    async fn poll_updates(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        while self.running.load(Ordering::Relaxed) {
-            match self.client.next_update().await {
+    async fn poll_updates(&self) -> Result<(), Box<dyn std::error::Error>> {
+        loop {
+            match tokio::select! {
+                biased;
+                _ = tokio::signal::ctrl_c() => Ok(None),
+                result = self.client.next_update() => result,
+            } {
                 Ok(update) => match update {
                     Some(update) => {
                         if let Update::NewMessage(message) = update {
                             if let Err(err) = self.on_message(message).await {
-                                self.log(&format!("Message handler: {err}")).await?;
-                            }
+                                self.log(format!("Message handler: {err}")).await;
+                            };
                         }
                     }
-                    None => return Ok(()),
-                },
-                Err(err) => {
-                    if let Err(err) = self.log(&format!("Update loop: {err}")).await {
-                        error!("Logging error: {err}");
+                    None => {
+                        warn!("Stopping…");
+                        break;
                     }
-                }
+                },
+                Err(err) => self.log(format!("Update loop: {err}")).await,
             };
         }
 
         Ok(())
     }
 
-    async fn on_message(&mut self, message: Message) -> Result<(), Box<dyn std::error::Error>> {
+    async fn on_message(&self, message: Message) -> Result<(), InvocationError> {
         let chat = message.chat();
 
         let sender_id = message
@@ -248,7 +241,7 @@ impl Bot {
     }
 
     async fn invoke_command(
-        &mut self,
+        &self,
         input: &str,
         context: &mut Context,
     ) -> Result<(), InvocationError> {
@@ -259,11 +252,6 @@ impl Bot {
 
         match (command, args) {
             ("ping", None) => context.message.delete().await?,
-            ("stop", None) => {
-                warn!("Stopping…");
-                self.running.store(false, Ordering::Relaxed);
-                context.message.delete().await?;
-            }
             ("id", None) => context.message.edit(context.chat.id().to_string()).await?,
             ("long" | "space", Some(message)) => {
                 context
@@ -282,17 +270,20 @@ impl Bot {
         Ok(())
     }
 
-    async fn log(&self, message: &str) -> Result<(), InvocationError> {
+    async fn log<T: AsRef<str>>(&self, message: T) {
+        let message = message.as_ref();
         warn!("Logging message: {message:?}");
-        self.client
+        let result = self
+            .client
             .send_message(self.logs_chat.unwrap(), message)
-            .await?;
-
-        Ok(())
+            .await;
+        if let Err(err) = result {
+            error!("Couldn't log error: {err}");
+        }
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     SimpleLogger::new()
         .with_level(LevelFilter::Warn)

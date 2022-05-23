@@ -1,8 +1,8 @@
 use grammers_client::client::chats::InvocationError;
 use grammers_client::types::{Chat, Message};
 use grammers_client::{Client, InputMessage};
-use rand::prelude::SliceRandom;
-use rand::Rng;
+use rand::prelude::{SliceRandom, StdRng};
+use rand::{Rng, SeedableRng};
 
 use crate::ZENON;
 
@@ -25,7 +25,7 @@ pub struct Context {
 }
 
 pub async fn strategia(ctx: &Context) -> Result<(), InvocationError> {
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::from_entropy();
     let mut messages = Vec::new();
     while rng.gen::<bool>() {
         messages.push(
@@ -46,7 +46,7 @@ pub async fn strategia(ctx: &Context) -> Result<(), InvocationError> {
 }
 
 pub async fn zenon(ctx: &Context) -> Result<(), InvocationError> {
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::from_entropy();
     ctx.message
         .reply(InputMessage::markdown(format!(
             "dzięki [{name}](tg://user?id={id}) {text}",
@@ -69,7 +69,7 @@ pub async fn zenon_http_noob(ctx: &Context) -> Result<(), InvocationError> {
 
 pub async fn polskie_krajobrazy(ctx: &Context) -> Result<(), InvocationError> {
     ctx.message
-        .reply(*RESPONSES.choose(&mut rand::thread_rng()).unwrap())
+        .reply(*RESPONSES.choose(&mut StdRng::from_entropy()).unwrap())
         .await?;
 
     Ok(())
