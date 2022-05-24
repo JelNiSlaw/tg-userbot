@@ -12,5 +12,6 @@ grammers-session = { git = "https://github.com/Lonami/grammers" }
 grammers-tl-types = { git = "https://github.com/Lonami/grammers" }
 log = "0.4"
 simple_logger = { version = "2.1", features = ["threads", "nightly"] }
+async-trait = "0.1"
 rand = "0.8"
 rpassword = "6.0"

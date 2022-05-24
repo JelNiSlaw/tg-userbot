@@ -4,7 +4,7 @@ use grammers_client::{Client, InputMessage};
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{Rng, SeedableRng};
 
-use crate::ZENON;
+use crate::constants;
 
 const RESPONSES: [&str; 9] = [
     "zamknij ryj",
@@ -51,7 +51,7 @@ pub async fn zenon(ctx: &Context) -> Result<(), InvocationError> {
         .reply(InputMessage::markdown(format!(
             "dzięki [{name}](tg://user?id={id}) {text}",
             name = ["Zenon", "Zenon Witkowski"].choose(&mut rng).unwrap(),
-            id = ZENON,
+            id = constants::ZENON,
             text = RESPONSES.choose(&mut rng).unwrap()
         )))
         .await?;
