@@ -4,7 +4,7 @@ use grammers_client::{Client, InputMessage};
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{Rng, SeedableRng};
 
-use crate::constants;
+use crate::{constants, huggingface};
 
 const RESPONSES: [&str; 9] = [
     "zamknij ryj",
@@ -22,6 +22,22 @@ pub struct Context {
     pub client: Client,
     pub message: Message,
     pub chat: Chat,
+    pub http_client: reqwest::Client,
+}
+
+pub async fn gptj<S: Into<String>>(ctx: &Context, text: S) -> Result<(), InvocationError> {
+    let text = text.into();
+    let text = text.trim_start_matches("/gptj ");
+    if text.len() > 100 {
+        ctx.message.reply("za długie").await?;
+        return Ok(());
+    }
+    let generated_text = huggingface::gpt_j(ctx.http_client.clone(), text)
+        .await
+        .unwrap();
+    ctx.message.reply(generated_text).await?;
+
+    Ok(())
 }
 
 pub async fn strategia(ctx: &Context) -> Result<(), InvocationError> {

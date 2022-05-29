@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 use grammers_client::client::chats::InvocationError;
 use grammers_client::types::{Media, Message};
-use grammers_client::Client as GrammersClient;
 use grammers_session::PackedChat;
 use grammers_tl_types as tl;
 use log::{error, warn};
 
-use crate::client::EventHandler;
+use crate::client::{Client, EventHandler};
 use crate::commands::{self, Context};
 use crate::constants;
 
@@ -22,11 +21,7 @@ impl Handler {
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn on_message(
-        &self,
-        client: GrammersClient,
-        message: Message,
-    ) -> Result<(), InvocationError> {
+    async fn on_message(&self, client: Client, message: Message) -> Result<(), InvocationError> {
         let chat = message.chat();
 
         let sender_id = message
@@ -35,15 +30,16 @@ impl EventHandler for Handler {
             .unwrap_or_else(|| chat.id());
 
         let mut context = Context {
-            client: client.clone(),
+            client: client.client.clone(),
             chat: message.chat(),
             message,
+            http_client: client.http_client,
         };
 
         match sender_id {
             constants::JELNISLAW => {
                 if context.message.text().starts_with('=') {
-                    self.invoke_command(&context.message.text()[1..].to_string(), &mut context)
+                    self.invoke_command(&context.message.text().to_string()[1..], &mut context)
                         .await?;
                 }
             }
@@ -93,8 +89,14 @@ impl EventHandler for Handler {
             _ => (),
         }
 
-        if context.message.text() == "/prpr@JelNiSlaw" {
+        let message_text = context.message.text();
+
+        if message_text == "/prpr@JelNiSlaw" {
             context.message.reply("Peropero").await?;
+        }
+
+        if let Some(text) = message_text.strip_prefix("/gptj ") {
+            commands::gptj(&context, text).await?;
         }
 
         Ok(())
@@ -130,9 +132,12 @@ impl EventHandler for Handler {
         Ok(())
     }
 
-    async fn log(&self, client: GrammersClient, message: String) {
+    async fn log(&self, client: Client, message: String) {
         warn!("Logging message: {message:?}");
-        let result = client.send_message(self.logs_chat.unwrap(), message).await;
+        let result = client
+            .client
+            .send_message(self.logs_chat.unwrap(), message)
+            .await;
         if let Err(err) = result {
             error!("Couldn't log error: {err}");
         }

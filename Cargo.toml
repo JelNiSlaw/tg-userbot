@@ -10,8 +10,11 @@ grammers-client = { git = "https://github.com/Lonami/grammers", features = [
 ] }
 grammers-session = { git = "https://github.com/Lonami/grammers" }
 grammers-tl-types = { git = "https://github.com/Lonami/grammers" }
+reqwest = { version = "0.11", features = ["json"] }
+serde = "1.0"
 log = "0.4"
 simple_logger = { version = "2.1", features = ["threads", "nightly"] }
+dotenv = "0.15"
 async-trait = "0.1"
 rand = "0.8"
 rpassword = "6.0"

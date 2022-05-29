@@ -14,24 +14,22 @@ use crate::{constants, utils};
 
 #[async_trait]
 pub trait EventHandler: Send + Sync {
-    async fn on_message(
-        &self,
-        client: GrammersClient,
-        message: Message,
-    ) -> Result<(), InvocationError>;
+    async fn on_message(&self, client: Client, message: Message) -> Result<(), InvocationError>;
     async fn invoke_command(
         &self,
         input: &str,
         context: &mut Context,
     ) -> Result<(), InvocationError>;
-    async fn log(&self, client: GrammersClient, message: String);
+    async fn log(&self, client: Client, message: String);
 }
 
+#[derive(Clone)]
 pub struct Client {
-    client: GrammersClient,
+    pub client: GrammersClient,
     event_handler: Arc<dyn EventHandler>,
-    session_filename: String,
+    session_filename: Arc<str>,
     logs_chat: Option<PackedChat>,
+    pub http_client: reqwest::Client,
 }
 
 impl Client {
@@ -41,6 +39,7 @@ impl Client {
     ) -> Result<Self, AuthorizationError> {
         info!("Reading the session file");
         let session = Session::load_file_or_create(session_filename)?;
+
         Ok(Self {
             client: GrammersClient::connect(Config {
                 session,
@@ -55,8 +54,9 @@ impl Client {
             })
             .await?,
             event_handler: Arc::new(event_handler),
-            session_filename: session_filename.to_string(),
+            session_filename: Arc::from(session_filename),
             logs_chat: None,
+            http_client: reqwest::Client::new(),
         })
     }
 
@@ -128,7 +128,7 @@ impl Client {
 
     fn save_session(&self) -> io::Result<()> {
         info!("Saving the session file");
-        self.client.session().save_to_file(&self.session_filename)
+        self.client.session().save_to_file(&*self.session_filename)
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -159,7 +159,7 @@ impl Client {
                 Ok(update) => match update {
                     Some(update) => {
                         let event_handler = self.event_handler.clone();
-                        let client = self.client.clone();
+                        let client = self.clone();
                         tokio::spawn(async move {
                             if let Update::NewMessage(message) = update {
                                 if let Err(err) =
@@ -176,7 +176,7 @@ impl Client {
                 },
                 Err(err) => {
                     self.event_handler
-                        .log(self.client.clone(), format!("Update loop: {err}"))
+                        .log(self.clone(), format!("Update loop: {err}"))
                         .await;
                     break;
                 }

@@ -4,6 +4,7 @@ mod client;
 mod commands;
 mod constants;
 mod handler;
+mod huggingface;
 mod utils;
 
 use client::Client;
@@ -11,11 +12,15 @@ use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() {
+    dotenv::dotenv().unwrap();
     SimpleLogger::new()
         .with_level(LevelFilter::Warn)
         .with_module_level("tg_userbot", LevelFilter::Debug)
-        .init()?;
-    let mut bot = Client::new(handler::Handler::new(), ".session").await?;
-    bot.start().await
+        .init()
+        .unwrap();
+    let mut bot = Client::new(handler::Handler::new(), ".session")
+        .await
+        .unwrap();
+    bot.start().await.unwrap();
 }
