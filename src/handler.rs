@@ -36,11 +36,27 @@ impl EventHandler for Handler {
             http_client: client.http_client,
         };
 
+        let message_text = context.message.text().to_string();
+
         match sender_id {
             constants::JELNISLAW => {
-                if context.message.text().starts_with('=') {
-                    self.invoke_command(&context.message.text().to_string()[1..], &mut context)
+                if message_text.starts_with('=') {
+                    self.invoke_command(&message_text[1..], &mut context)
                         .await?;
+                }
+            }
+            constants::ZENON => {
+                if message_text.contains("https://") {
+                    commands::zenon(&context).await?
+                } else if message_text.contains("http://") {
+                    commands::zenon_http_noob(&context).await?;
+                }
+            }
+            constants::CRASH => {
+                let lowercase = message_text.to_lowercase();
+                let words = lowercase.split_ascii_whitespace().collect::<Vec<_>>();
+                if words.contains(&"obejrz") {
+                    context.message.reply("*obejrzyj").await?;
                 }
             }
             constants::JAROSŁAW_KARCEWICZ => {
@@ -51,14 +67,6 @@ impl EventHandler for Handler {
                     .any(|m| matches!(m, Media::Document { .. }))
                 {
                     commands::strategia(&context).await?;
-                }
-            }
-            constants::ZENON => {
-                let text = context.message.text();
-                if text.contains("https://") {
-                    commands::zenon(&context).await?
-                } else if text.contains("http://") {
-                    commands::zenon_http_noob(&context).await?;
                 }
             }
             constants::POLSKIE_KRAJOBRAZY => {
@@ -82,14 +90,12 @@ impl EventHandler for Handler {
         #[allow(clippy::single_match)]
         match chat.id() {
             constants::BAWIALNIA => {
-                if context.message.text().starts_with("@JelNiSlaw powiedz ") {
+                if message_text.starts_with("@JelNiSlaw powiedz ") {
                     commands::say(&context).await?;
                 }
             }
             _ => (),
         }
-
-        let message_text = context.message.text();
 
         if message_text == "/prpr@JelNiSlaw" {
             context.message.reply("Peropero").await?;
