@@ -3,8 +3,8 @@
 mod client;
 mod commands;
 mod constants;
+mod eleuther;
 mod handler;
-mod huggingface;
 mod utils;
 
 use client::Client;
@@ -13,7 +13,6 @@ use simple_logger::SimpleLogger;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    dotenv::dotenv().unwrap();
     SimpleLogger::new()
         .with_level(LevelFilter::Warn)
         .with_module_level("tg_userbot", LevelFilter::Debug)

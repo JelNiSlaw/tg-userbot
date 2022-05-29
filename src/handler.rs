@@ -40,9 +40,8 @@ impl EventHandler for Handler {
 
         match sender_id {
             constants::JELNISLAW => {
-                if message_text.starts_with('=') {
-                    self.invoke_command(&message_text[1..], &mut context)
-                        .await?;
+                if let Some(text) = message_text.strip_prefix('=') {
+                    self.invoke_command(text, &mut context).await?;
                 }
             }
             constants::ZENON => {
@@ -54,8 +53,7 @@ impl EventHandler for Handler {
             }
             constants::CRASH => {
                 let lowercase = message_text.to_lowercase();
-                let words = lowercase.split_ascii_whitespace().collect::<Vec<_>>();
-                if words.contains(&"obejrz") {
+                if lowercase.split_ascii_whitespace().any(|w| w == "obejrz") {
                     context.message.reply("*obejrzyj").await?;
                 }
             }

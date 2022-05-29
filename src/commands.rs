@@ -4,7 +4,7 @@ use grammers_client::{Client, InputMessage};
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{Rng, SeedableRng};
 
-use crate::{constants, huggingface};
+use crate::{constants, eleuther};
 
 const RESPONSES: [&str; 9] = [
     "zamknij ryj",
@@ -32,9 +32,9 @@ pub async fn gptj<S: Into<String>>(ctx: &Context, text: S) -> Result<(), Invocat
         ctx.message.reply("za długie").await?;
         return Ok(());
     }
-    let generated_text = huggingface::gpt_j(ctx.http_client.clone(), text)
+    let generated_text = eleuther::gpt_j(ctx.http_client.clone(), text)
         .await
-        .unwrap();
+        .unwrap_or_else(|_| String::from("zjebalo sie"));
     ctx.message.reply(generated_text).await?;
 
     Ok(())
