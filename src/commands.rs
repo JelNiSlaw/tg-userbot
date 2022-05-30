@@ -28,10 +28,6 @@ pub struct Context {
 pub async fn gptj<S: Into<String>>(ctx: &Context, text: S) -> Result<(), InvocationError> {
     let text = text.into();
     let text = text.trim_start_matches("/gptj ");
-    if text.len() > 100 {
-        ctx.message.reply("za długie").await?;
-        return Ok(());
-    }
     let generated_text = eleuther::gpt_j(ctx.http_client.clone(), text)
         .await
         .unwrap_or_else(|_| String::from("zjebalo sie"));

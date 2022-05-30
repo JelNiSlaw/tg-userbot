@@ -53,6 +53,9 @@ impl EventHandler for Handler {
             }
             constants::CRASH => {
                 let lowercase = message_text.to_lowercase();
+                if lowercase.contains("pytaj mu") {
+                    context.message.reply("*zapytaj go").await?;
+                }
                 if lowercase.split_ascii_whitespace().any(|w| w == "obejrz") {
                     context.message.reply("*obejrzyj").await?;
                 }
